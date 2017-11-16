@@ -12,26 +12,40 @@ namespace ObjectPrinting.Tests
 		{
 			var person = new Person { Name = "Alex", Age = 19 };
 
-			var printer = ObjectPrinter.For<Person>().Printing(perso => perso.Age).Using(x => "kek");
+			var printer = ObjectPrinter.For<Person>();
 				//1. Исключить из сериализации свойства определенного типа
-				//DONE
+				//Designed
+				//Implemented
 
 				//2. Указать альтернативный способ сериализации для определенного типа
-				//DONE?
+				//Designed
+				//Implemented
 			
 				//3. Для числовых типов указать культуру
-				//DONE
+				//Designed
+				//Implemented
 			
 				//4. Настроить сериализацию конкретного свойства
+				//Designed
+				//NOT implemented
 			
 				//5. Настроить обрезание строковых свойств (метод должен быть виден только для строковых свойств)
+				//Designed?
+				//NOT implemented
 			
 				//6. Исключить из сериализации конкретного свойства
+				//Designed
+				//NOT implemented
             
             string s1 = printer.PrintToString(person);
 
-			//7. Синтаксический сахар в виде метода расширения, сериализующего по-умолчанию		
+			//7. Синтаксический сахар в виде метода расширения, сериализующего по-умолчанию	
+			//NOT designed
+			//NOT implemented
+			
 			//8. ...с конфигурированием
+			//NOT designed
+			//NOT implemented
 		}
 	}
 }

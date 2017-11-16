@@ -7,36 +7,51 @@ using System.Text;
 
 namespace ObjectPrinting
 {
-    public class PrintingConfig<TOwner> 
+    public class PrintingConfig<TOwner> : IPrintingConfig<TOwner>
     {
         public PrintingConfig()
         {
-            this.excludedTypes = new HashSet<Type>();
-        }
-
-        private PrintingConfig<TOwner> AddCulture(Type type, CultureInfo culture)
-        {
-            return this;
+            propertySerializators = new Dictionary<string, Delegate>();
+            excludedTypes = new HashSet<Type>();
+            excludedProperties = new HashSet<string>();
+            typeSerializators = new Dictionary<Type, Delegate>();
+            cultures = new Dictionary<Type, CultureInfo>();
         }
 
         public string PrintToString(TOwner obj)
         {
             return PrintToString(obj, 0);
         }
+        
+        // ReSharper disable once StaticMemberInGenericType
+        private static readonly Type[] FinalTypes = 
+        {
+            typeof(int),
+            typeof(uint),
+            typeof(long),
+            typeof(ulong),
+            typeof(short),
+            typeof(ushort),
+            typeof(sbyte),
+            typeof(byte),
+            typeof(double), 
+            typeof(float),
+            typeof(decimal),
+            typeof(string),
+            typeof(DateTime), 
+            typeof(TimeSpan)
+        };
 
         private string PrintToString(object obj, int nestingLevel)
         {
             //TODO apply configurations
             if (obj == null)
                 return "null" + Environment.NewLine;
-
-            var finalTypes = new[]
+            
+            if (FinalTypes.Contains(obj.GetType()))
             {
-                typeof(int), typeof(double), typeof(float), typeof(string),
-                typeof(DateTime), typeof(TimeSpan)
-            };
-            if (finalTypes.Contains(obj.GetType()))
                 return obj + Environment.NewLine;
+            }
 
             var identation = new string('\t', nestingLevel + 1);
             var sb = new StringBuilder();
@@ -44,9 +59,35 @@ namespace ObjectPrinting
             sb.AppendLine(type.Name);
             foreach (var propertyInfo in type.GetProperties())
             {
-                sb.Append(identation + propertyInfo.Name + " = " +
-                          PrintToString(propertyInfo.GetValue(obj),
-                              nestingLevel + 1));
+                string toAppend;
+                var propertyType = propertyInfo.PropertyType;
+                if (excludedTypes.Contains(propertyType))
+                {
+                    continue;
+                }
+                if (typeSerializators.ContainsKey(propertyType))
+                {
+                    if (propertyInfo.GetValue(obj) is null)
+                    {
+                        toAppend = "null" + Environment.NewLine;
+                    }
+                    else
+                    {
+                        toAppend = typeSerializators[propertyType].DynamicInvoke(propertyInfo.GetValue(obj))
+                                   + Environment.NewLine;
+                    }
+                }
+                else if (cultures.ContainsKey(propertyType))
+                {
+                    toAppend = ((IFormattable)propertyInfo.GetValue(obj)).ToString(null, cultures[propertyType])
+                               + Environment.NewLine;
+                }
+                else
+                {
+                    toAppend = PrintToString(propertyInfo.GetValue(obj),
+                        nestingLevel + 1);
+                }
+                sb.Append(identation + propertyInfo.Name + " = " + toAppend);
             }
             return sb.ToString();
         }
@@ -58,17 +99,49 @@ namespace ObjectPrinting
 
         public SerializeConfig<TOwner, TPropType> Printing<TPropType>(Expression<Func<TOwner, TPropType>> propertySelector)
         {
-            return new SerializeConfig<TOwner, TPropType>(this);
+            return new SerializeConfig<TOwner, TPropType>(this, propertySelector);
         }
+        
 
         private readonly HashSet<Type> excludedTypes;
-        
-        public PrintingConfig<TOwner> ExcludeType<TType>()
+        public PrintingConfig<TOwner> ExcludingType<TType>()
         {
             excludedTypes.Add(typeof(TType));
             return this;
         }
 
+        private readonly HashSet<string> excludedProperties;
+        public PrintingConfig<TOwner> Excluding<TType>(Expression<Func<TOwner, TType>> propertySelector)
+        {
+            excludedProperties.Add(propertySelector.Body.ToString());
+            return this;
+        }
+
+
+        private readonly Dictionary<string, Delegate> propertySerializators;
+        void IPrintingConfig<TOwner>.AddCustomPropertySerializator(string propertyPath, Delegate serializator)
+        {
+            propertySerializators[propertyPath] = serializator;
+        }
+
+        private readonly Dictionary<Type, Delegate> typeSerializators;
+        void IPrintingConfig<TOwner>.AddCustomTypeSerializator(Type type, Delegate serializator)
+        {
+            typeSerializators[type] = serializator;
+        }
+
+        private readonly Dictionary<Type, CultureInfo> cultures;
+        void IPrintingConfig<TOwner>.AddCustomCulture(Type type, CultureInfo culture)
+        {
+            cultures[type] = culture;
+        }
+    }
+
+    public interface IPrintingConfig<TOwner>
+    {
+        void AddCustomPropertySerializator(string propertyPath, Delegate serializator);
+        void AddCustomTypeSerializator(Type type, Delegate serializator);
+        void AddCustomCulture(Type type, CultureInfo culture);
     }
 
 }

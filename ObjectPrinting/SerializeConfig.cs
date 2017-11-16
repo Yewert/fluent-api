@@ -1,22 +1,27 @@
 ﻿using System;
-using System.Globalization;
 using System.Linq.Expressions;
 
 namespace ObjectPrinting
 {
     public class SerializeConfig<TOwner, TSerializble> : PrintingConfig<TOwner>, ISerializeConfig<TOwner, TSerializble>
     {
-        private PrintingConfig<TOwner> printingConfig;
-        public SerializeConfig(PrintingConfig<TOwner> printingConfig)
+        private readonly PrintingConfig<TOwner> printingConfig;
+        private readonly Expression<Func<TOwner, TSerializble>> propertySelector;
+
+        public SerializeConfig(PrintingConfig<TOwner> printingConfig,
+            Expression<Func<TOwner, TSerializble>> propertySelector = null)
         {
             this.printingConfig = printingConfig;
+            this.propertySelector = propertySelector;
         } 
 
         public PrintingConfig<TOwner> Using(Func<TSerializble, string> fucc)
         {
-            /*TODO: either add application of fucc to all fields
-             or some specific field that was passed to this class through a constructor
-              from printing method of PrintigConfig class*/
+            if (propertySelector is null)
+                ((IPrintingConfig<TOwner>) printingConfig).AddCustomTypeSerializator(typeof(TSerializble), fucc);
+            else
+                ((IPrintingConfig<TOwner>) printingConfig).AddCustomPropertySerializator(
+                    propertySelector.Body.ToString(), fucc);
             return printingConfig;
         }
 
