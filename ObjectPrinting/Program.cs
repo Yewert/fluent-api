@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Globalization;
 using ObjectPrinting.Tests;
 
 namespace ObjectPrinting
@@ -8,12 +7,10 @@ namespace ObjectPrinting
     {
         public static void Main(string[] args)
         {
-            var person = new Person { Name = "Alex", Height = 20.2, Age = 19 , Dog = new Dog { Name = "woof"}};
+            var person = new Person { Name = "Alex", Height = 20.2, Age = 19 , Dog = new Dog { Name = "Woofer" },
+                Brotha = new Person { Name = "Jeff", Height = 200.0, Age = 12, Dog = new Dog { Name = "Barkinson"}}};
 
-            var printer = ObjectPrinter.For<Person>()
-                .Printing<Dog>().Using(x => "kek")
-                .Printing<double>().Using(new CultureInfo("ru-RU"))
-                .ExcludingType<int>();
+            var printer = ObjectPrinter.For<Person>().Excluding(p => p.Brotha.Dog.Name);
             
             Console.Write(printer.PrintToString(person));
         }

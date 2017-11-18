@@ -12,6 +12,7 @@ namespace ObjectPrinting.Tests
 			set;
 		}
 		public int Age { get; set; }
+		public Person Brotha { get; set; }
 	}
 
 	public class Dog

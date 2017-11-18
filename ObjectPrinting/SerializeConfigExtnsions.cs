@@ -34,10 +34,12 @@ namespace ObjectPrinting
             return conf;
         }
 
-        public static PrintingConfig<TOwner> Using<TOwner>(this SerializeConfig<TOwner, string> config,
-            int index, int length)
+        public static PrintingConfig<TOwner> WithMaxLength<TOwner>(this SerializeConfig<TOwner, string> config, 
+            int length)
         {
-            return ((ISerializeConfig<TOwner, string>) config).PrintingConfig;
+            var conf = ((ISerializeConfig<TOwner, string>) config).PrintingConfig;
+            ((IPrintingConfig<TOwner>) conf).AddMaxLength(length);
+            return conf;
         }
     }
 }
