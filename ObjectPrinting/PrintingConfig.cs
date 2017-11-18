@@ -4,6 +4,8 @@ using System.Globalization;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Text;
+using System.Reflection;
+using System.Runtime.InteropServices;
 
 namespace ObjectPrinting
 {
@@ -20,7 +22,7 @@ namespace ObjectPrinting
 
         public string PrintToString(TOwner obj)
         {
-            return PrintToString(obj, 0);
+            return PrintToString(obj, 0, obj.GetType().ToString());
         }
         
         // ReSharper disable once StaticMemberInGenericType
@@ -39,10 +41,11 @@ namespace ObjectPrinting
             typeof(decimal),
             typeof(string),
             typeof(DateTime), 
-            typeof(TimeSpan)
+            typeof(TimeSpan),
+            typeof(Guid)
         };
 
-        private string PrintToString(object obj, int nestingLevel)
+        private string PrintToString(object obj, int nestingLevel, string path)
         {
             //TODO apply configurations
             if (obj == null)
@@ -50,6 +53,8 @@ namespace ObjectPrinting
             
             if (FinalTypes.Contains(obj.GetType()))
             {
+                if (obj is string s && !(length is null))
+                    return s.Substring(0, length.Value) + Environment.NewLine;
                 return obj + Environment.NewLine;
             }
 
@@ -60,33 +65,30 @@ namespace ObjectPrinting
             foreach (var propertyInfo in type.GetProperties())
             {
                 string toAppend;
+                var propPath = path + "." + propertyInfo.Name;
                 var propertyType = propertyInfo.PropertyType;
-                if (excludedTypes.Contains(propertyType))
-                {
+                if(excludedProperties.Contains(propPath))
                     continue;
+                if (excludedTypes.Contains(propertyType))
+                    continue;
+                if (propertySerializators.ContainsKey(propPath))
+                {
+                    toAppend = propertySerializators[propPath].DynamicInvoke(propertyInfo.GetValue(obj)) + Environment.NewLine;
                 }
-                if (typeSerializators.ContainsKey(propertyType))
+                else if (typeSerializators.ContainsKey(propertyType))
                 {
                     if (propertyInfo.GetValue(obj) is null)
-                    {
                         toAppend = "null" + Environment.NewLine;
-                    }
                     else
-                    {
                         toAppend = typeSerializators[propertyType].DynamicInvoke(propertyInfo.GetValue(obj))
                                    + Environment.NewLine;
-                    }
                 }
                 else if (cultures.ContainsKey(propertyType))
-                {
                     toAppend = ((IFormattable)propertyInfo.GetValue(obj)).ToString(null, cultures[propertyType])
                                + Environment.NewLine;
-                }
                 else
-                {
                     toAppend = PrintToString(propertyInfo.GetValue(obj),
-                        nestingLevel + 1);
-                }
+                        nestingLevel + 1, propPath);
                 sb.Append(identation + propertyInfo.Name + " = " + toAppend);
             }
             return sb.ToString();
@@ -99,7 +101,8 @@ namespace ObjectPrinting
 
         public SerializeConfig<TOwner, TPropType> Printing<TPropType>(Expression<Func<TOwner, TPropType>> propertySelector)
         {
-            return new SerializeConfig<TOwner, TPropType>(this, propertySelector);
+            var propertyPath = ExtractPropertyPath(propertySelector);
+            return new SerializeConfig<TOwner, TPropType>(this, propertyPath);
         }
         
 
@@ -111,9 +114,9 @@ namespace ObjectPrinting
         }
 
         private readonly HashSet<string> excludedProperties;
-        public PrintingConfig<TOwner> Excluding<TType>(Expression<Func<TOwner, TType>> propertySelector)
+        public PrintingConfig<TOwner> ExcludingProperty<TType>(Expression<Func<TOwner, TType>> propertySelector)
         {
-            excludedProperties.Add(propertySelector.Body.ToString());
+            excludedProperties.Add(ExtractPropertyPath(propertySelector));
             return this;
         }
 
@@ -135,6 +138,21 @@ namespace ObjectPrinting
         {
             cultures[type] = culture;
         }
+
+        private int? length;
+        void IPrintingConfig<TOwner>.AddMaxLength(int length)
+        {
+            this.length = length;
+        }
+
+        private string ExtractPropertyPath<TType>(Expression<Func<TOwner, TType>> propertySelector)
+        {
+            var propertyPath = typeof(TOwner).ToString();
+            var member = (propertySelector.Body as MemberExpression).ToString();
+            var index = member.IndexOf('.');
+            member = member.Substring(index);
+            return propertyPath + member;
+        }
     }
 
     public interface IPrintingConfig<TOwner>
@@ -142,6 +160,7 @@ namespace ObjectPrinting
         void AddCustomPropertySerializator(string propertyPath, Delegate serializator);
         void AddCustomTypeSerializator(Type type, Delegate serializator);
         void AddCustomCulture(Type type, CultureInfo culture);
+        void AddMaxLength(int length);
     }
 
 }
