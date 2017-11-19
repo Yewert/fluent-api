@@ -69,27 +69,30 @@ namespace ObjectPrinting
                 if (excludedTypes.Contains(propertyType))
                     continue;
                 sb.Append(identation + propertyInfo.Name + " = " 
-                          + AppendNextProperty(propertyType, propertyPath, obj, propertyInfo, nestingLevel));
+                          + SerializeProperty(propertyType,
+                              propertyPath,
+                              propertyInfo.GetValue(obj),
+                              nestingLevel));
             }
             return sb.ToString();
         }
 
-        private string AppendNextProperty(Type propertyType,
-            string propPath, object obj, PropertyInfo propertyInfo, int nestingLevel)
+        private string SerializeProperty(Type propertyType,
+            string propPath, object value, int nestingLevel)
         {
             if (propertySerializators.ContainsKey(propPath))
-                return propertySerializators[propPath].DynamicInvoke(propertyInfo.GetValue(obj)) + Environment.NewLine;
+                return propertySerializators[propPath].DynamicInvoke(value) + Environment.NewLine;
             if (typeSerializators.ContainsKey(propertyType))
             {
-                if (propertyInfo.GetValue(obj) is null)
+                if (value is null)
                     return "null" + Environment.NewLine;
-                return typeSerializators[propertyType].DynamicInvoke(propertyInfo.GetValue(obj))
+                return typeSerializators[propertyType].DynamicInvoke(value)
                            + Environment.NewLine;
             }
             if (cultures.ContainsKey(propertyType))
-                return ((IFormattable)propertyInfo.GetValue(obj)).ToString(null, cultures[propertyType])
+                return ((IFormattable)value).ToString(null, cultures[propertyType])
                            + Environment.NewLine;
-            return PrintToString(propertyInfo.GetValue(obj),
+            return PrintToString(value,
                     nestingLevel + 1, propPath);
         }
 
@@ -147,6 +150,7 @@ namespace ObjectPrinting
         private string ExtractPropertyPath<TType>(Expression<Func<TOwner, TType>> propertySelector)
         {
             var propertyPath = typeof(TOwner).ToString();
+            // ReSharper disable once PossibleNullReferenceException
             var member = (propertySelector.Body as MemberExpression).ToString();
             var index = member.IndexOf('.');
             member = member.Substring(index);
