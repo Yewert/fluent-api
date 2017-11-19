@@ -5,7 +5,6 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Text;
 using System.Reflection;
-using System.Runtime.InteropServices;
 
 namespace ObjectPrinting
 {
@@ -47,7 +46,6 @@ namespace ObjectPrinting
 
         private string PrintToString(object obj, int nestingLevel, string path)
         {
-            //TODO apply configurations
             if (obj == null)
                 return "null" + Environment.NewLine;
             
@@ -64,34 +62,35 @@ namespace ObjectPrinting
             sb.AppendLine(type.Name);
             foreach (var propertyInfo in type.GetProperties())
             {
-                string toAppend;
-                var propPath = path + "." + propertyInfo.Name;
+                var propertyPath = path + "." + propertyInfo.Name;
                 var propertyType = propertyInfo.PropertyType;
-                if(excludedProperties.Contains(propPath))
+                if(excludedProperties.Contains(propertyPath))
                     continue;
                 if (excludedTypes.Contains(propertyType))
                     continue;
-                if (propertySerializators.ContainsKey(propPath))
-                {
-                    toAppend = propertySerializators[propPath].DynamicInvoke(propertyInfo.GetValue(obj)) + Environment.NewLine;
-                }
-                else if (typeSerializators.ContainsKey(propertyType))
-                {
-                    if (propertyInfo.GetValue(obj) is null)
-                        toAppend = "null" + Environment.NewLine;
-                    else
-                        toAppend = typeSerializators[propertyType].DynamicInvoke(propertyInfo.GetValue(obj))
-                                   + Environment.NewLine;
-                }
-                else if (cultures.ContainsKey(propertyType))
-                    toAppend = ((IFormattable)propertyInfo.GetValue(obj)).ToString(null, cultures[propertyType])
-                               + Environment.NewLine;
-                else
-                    toAppend = PrintToString(propertyInfo.GetValue(obj),
-                        nestingLevel + 1, propPath);
-                sb.Append(identation + propertyInfo.Name + " = " + toAppend);
+                sb.Append(identation + propertyInfo.Name + " = " 
+                          + AppendNextProperty(propertyType, propertyPath, obj, propertyInfo, nestingLevel));
             }
             return sb.ToString();
+        }
+
+        private string AppendNextProperty(Type propertyType,
+            string propPath, object obj, PropertyInfo propertyInfo, int nestingLevel)
+        {
+            if (propertySerializators.ContainsKey(propPath))
+                return propertySerializators[propPath].DynamicInvoke(propertyInfo.GetValue(obj)) + Environment.NewLine;
+            if (typeSerializators.ContainsKey(propertyType))
+            {
+                if (propertyInfo.GetValue(obj) is null)
+                    return "null" + Environment.NewLine;
+                return typeSerializators[propertyType].DynamicInvoke(propertyInfo.GetValue(obj))
+                           + Environment.NewLine;
+            }
+            if (cultures.ContainsKey(propertyType))
+                return ((IFormattable)propertyInfo.GetValue(obj)).ToString(null, cultures[propertyType])
+                           + Environment.NewLine;
+            return PrintToString(propertyInfo.GetValue(obj),
+                    nestingLevel + 1, propPath);
         }
 
         public SerializeConfig<TOwner, TType> Printing<TType>()

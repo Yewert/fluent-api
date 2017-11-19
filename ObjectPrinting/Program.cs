@@ -13,6 +13,10 @@ namespace ObjectPrinting
             var printer = ObjectPrinter.For<Person>().ExcludingProperty(p => p.Brotha.Dog.Name);
             
             Console.Write(printer.PrintToString(person));
+            
+            Console.WriteLine("=== same using extension method ===");
+            
+            Console.Write(person.PrintToString(pr => pr.ExcludingProperty(p => p.Brotha.Dog.Name)));
         }
     }
 }
